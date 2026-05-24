@@ -25,6 +25,14 @@ El proyecto utiliza:
 - Bootstrap no paramétrico
 - Datos agrupados por intervalos de ingreso
 
+## Referencia
+
+Walter, P., Groß, M., Schmid, T., & Weimer, K. (2022).
+*Iterative Kernel Density Estimation Applied to Grouped Data*.
+Journal of Official Statistics, 38(2), 599–635.
+
+https://doi.org/10.2478/jos-2022-0027
+
 ## Fuente de datos
 
 - DANE — Medición de Pobreza Monetaria y Desigualdad 2024
@@ -33,3 +41,6 @@ Variable principal utilizada:
 
 ```r
 ingpcug
+
+
+
