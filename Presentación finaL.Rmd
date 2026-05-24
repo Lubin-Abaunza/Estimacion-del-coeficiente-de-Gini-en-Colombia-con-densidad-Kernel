@@ -1,0 +1,537 @@
+---
+title: "Estimación del Coeficiente de Gini para Colombia mediante Algoritmo Iterativo de Densidad Kernel con Datos Agrupados."
+subtitle: "Aplicación práctica con la dase de datos de Medición de Pobreza Monetaria y Desigualdad 2024 del DANE"
+author: "Lubin Fernando Abaunza Melo"
+date: "20 de Noviembre"
+output:
+  html_document:
+    toc: false
+    toc_depth: 3
+    number_sections: false     # ← SIN numeración automática
+    theme: united              # ← Puedes dejarlo o cambiarlo
+    css: style.css             # ← Archivo de estilos
+fontsize: 13pt
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+___
+
+# Artículo
+
+<img src="Ar.png" width="65%" style="display: block; margin: auto;">
+
+$$\\$$
+
+### Introducción
+
+
+-  El artículo propone una metodología **no paramétrica** para estimar indicadores de pobreza y desigualdad a partir de **datos de ingresos agrupados**.
+
+- El problema surge porque muchas encuestas, como el Microcenso Alemán, no recogen los ingresos exactos, sino intervalos
+
+- Esto impide aplicar las fórmulas estadísticas estándar.
+
+- La solución es un **algoritmo iterativo de densidad kernel (KDE)** que genera pseudo-muestras métricas a partir de los grupos.
+
+### Indicadores de pobreza
+
+### 1. Tasade de incidencia de la pobreza (HCR)
+
+$\\$
+
+$$
+\widehat{I}_{HCR} = 
+\frac{1}{\sum_{i=1}^{n} w_i}
+\sum_{i=1}^{n} w_i \, \mathbb{I}({X}_i \le z),
+$$
+
+donde:
+
+- $z$: línea de pobreza,  
+- ${X}_i$: ingreso ,
+- $w_i$: peso muestral.
+
+$\\$
+
+El HCR es una medida del porcentaje de observaciones (individuos u hogares) por debajo de la línea de pobreza
+
+
+
+### 2. Brecha de pobreza (PGap)
+
+$\\$
+
+$$
+\widehat{I}_{\text{PGAP}} = 
+\frac{1}{\sum_{i=1}^{n} w_i}
+\sum_{i=1}^{n} 
+w_i \left( \frac{z - \tilde{X}_i}{z} \right) 
+\mathbf{1}(\tilde{X}_i \leq z),
+$$
+
+
+donde:
+
+- $z$: línea de pobreza,  
+- ${X}_i$: ingreso ,
+- $w_i$: peso muestral.
+
+$\\$
+
+El Poverty Gap (PGap) mide la brecha promedio entre el ingreso de los hogares pobres y la línea de pobreza, expresada como proporción de dicha línea. Esto refleja cuán lejos, en promedio, están los pobres de superar la pobreza.
+
+$\\$
+
+###  3. Índice de Gini
+
+$\\$
+
+$$
+\widehat{I}_{\text{Gini}} =
+\frac{2\sum_{i=1}^{n} w_i \tilde{X}_i \sum_{j=1}^{i} w_j -
+\sum_{i=1}^{n} w_i^2 \tilde{X}_i}
+{(\sum_{i=1}^{n} w_i)(\sum_{i=1}^{n} w_i \tilde{X}_i)} - 1.
+$$
+
+$\\$
+
+El coeficiente de Gini toma valores en el intervalo $[0, 1]$, donde:
+
+- $0$ representa **igualdad perfecta**(todos los individuos poseen el mismo ingreso)
+
+- $1$ representa **desigualdad máxima** (un solo individuo concentra todos le ingreso)
+
+$\\$
+
+
+## Algoritmo KDE
+
+$\\$
+**Paso 1 – Inicialización** 
+
+Usar los puntos medios de los intervalos como valores iniciales $\tilde{X}_i^{(0)}$. 
+
+A partir de ellos, estimar una densidad preliminar $\hat{f}_h^{(0)}(x)$ mediante KDE con un kernel gaussiano.  
+
+$$
+\hat{f}_k^{(0)}(x) = \frac{1}{n h} \sum_{i=1}^n K\!\left( \frac{x - \tilde{X}_i^{(0)}}{h} \right),
+$$
+  
+El ancho de banda inicial $h_0$ se recomienda igual al doble del ancho del intervalo más grande.
+
+$\\$
+
+**Paso 2 – Construcción de la malla de evaluación:**
+
+Definir una malla de puntos $G = \{g_1, g_2, \ldots, g_j\}$ que cubra el rango total de la variable:
+
+$$
+\delta_g = \frac{|A_0 - A_{n_K}|}{j - 1}, \quad
+G = \{ g_1 = A_0, \, g_2 = A_0 + \delta_g, \, \ldots, \, g_j = A_{n_K} \}.
+$$
+
+$\\$
+
+**Paso 3 – Generación de pseudo-muestras: **
+
+Para cada grupo $K$, generar una pseudo-muestra $\tilde{X}_i$ dentro del intervalo $(A_{K-1}, A_K]$ con probabilidad proporcional a la densidad estimada:
+
+$$
+P(\tilde{X}_i = g_j) \propto \hat{f}_h(g_j), \quad g_j \in (A_{K-1}, A_K].
+$$
+
+$\\$
+
+**Paso 4 – Cálculo de los indicadores:**
+
+Usar la pseudo-muestra $\tilde{X}_i$ para calcular los indicadores deseados.(por ejemplo, HCR,PGap , Gini).
+
+$\\$
+
+**Paso 5 - Actualización de la densidad **
+
+Reestimar la densidad $\hat{f}_h(x)$ aplicando nuevamente KDE sobre la pseudo-muestra.  
+
+El ancho de banda $h$ puede calcularse mediante el método plug-in (minimiza el error cuadrático medio integrado (MISE)).
+
+$\\$
+
+**Paso 6 - Iteración**
+
+Repetir los pasos 3–5 durante un número total de iteraciones $B_{\text{KDE}} + S_{\text{KDE}}$,  donde $B_{\text{KDE}}$ son iteraciones de *burn-in}* (descartadas) y $S_{\text{KDE}}$ son las iteraciones de estimación final. 
+
+En el artículo, se emplean $B_{\text{KDE}} = 80$ y $S_{\text{KDE}} = 400$.
+
+$\\$
+
+**Paso 7 - Promediado final**
+
+El valor final de cada indicador se obtiene como el promedio de las estimaciones de las $S_{\text{KDE}}$ iteraciones posteriores al burn-in:
+
+$$
+\hat{I} = \frac{1}{S_{\text{KDE}}} \sum_{s=1}^{S_{\text{KDE}}} \hat{I}^{(s)}.
+$$
+
+$\\$
+
+## variabilidad
+
+Fuentes de variabilidad del estimador
+
+1. **Variabilidad interna del algoritmo KDE:** debida al carácter estocástico del muestreo condicional en las pseudo-muestras $\tilde{X}_i$.
+
+
+2. **Variabilidad del muestreo original:** derivada de que los datos provienen de una muestra.
+
+
+Por ello, la varianza final del estimador no puede obtenerse solo de las iteraciones internas del algoritmo.
+
+El artículo propone un **bootstrap no paramétrico externo** para la estimación de la varianza de los indicadores por el algoritmo KDE.
+
+**Paso 1**
+
+Se extrae una muestra  con reemplazo de los datos agrupados originales:
+
+$$X_i^{*}, \quad i = 1, \ldots, n.$$
+
+**Paso 2:**
+
+A la muestra  $X_i^{*}$ se le aplica **todo el algoritmo KDE** 
+(es decir, pasos 1 - 7), obteniendo una estimación:$\hat{I}^{*}$
+
+
+**Paso 3:**
+
+Repetir el parso ($1-2$) $B$ veses, el **error estándar bootstrap** se calcula  como:
+
+$$
+\hat{se}(\hat{I}) = \sqrt{\frac{1}{B-1} \sum_{b=1}^{B} \left( \hat{I}^{*(b)} - \overline{I}^{*} \right)^2}, \quad \text{donde } ~~ \overline{I}^{*} = \frac{1}{B} \sum_{b=1}^{B} \hat{I}^{*}(b).
+$$
+
+$\\$
+
+## Conclusiones del artículo
+
+- El algoritmo **KDE** supera a los métodos tradicionales utilizados por las oficinas estadísticas (Uni y Mid) en términos de menor sesgo en todos los escenarios evaluados.
+
+- Produce resultados prácticamente insesgados bajo distintos tipos de censura y diferentes distribuciones teóricas subyacentes.
+
+- El sesgo relativo aumenta ligeramente cuando disminuye el número de grupos, pero aun así:
+
+  * Incluso con censura extrema (solo 8 grupos), el algoritmo mantiene alta precisión.
+
+  * El sesgo relativo permanece por debajo del 1% para casi todos los indicadores.
+
+- En términos de precisión, el algoritmo **KDE** obtiene resultados comparables a la estimación directa basada en datos continuos no agrupados.
+
+- Frente a los métodos Uni y Mid, el **KDE** muestra mayor precisión en la mayoría de los indicadores evaluados.
+
+
+
+____
+
+# Valor agregado 
+
+$\\$
+$\\$
+
+<center>
+“**Ningún método estadístico es universalmente el mejor.<br>
+La elección depende de los datos, la pregunta y el contexto.**”  
+<br>
+— *Peter McCullagh*
+</center>
+
+$$\\$$
+
+### Linea de pobreza
+
+| **Método** | **En qué consiste** | **Dónde se usa** | **Ventajas** | **Desventajas** |
+|------------|----------------------|------------------|---------------|------------------|
+| **Línea de pobreza relativa** | Mide pobreza respecto a los estándares sociales actuales. Típicamente es el **50% o 60% de la mediana del ingreso**.  | Países de la **Unión Europea** (Eurostat usa 60% de la mediana), **Reino Unido**, **Australia**, y organismos como la **OECD**. | - Captura desigualdad relativa.<br>- Se ajusta automáticamente a cambios económicos.<br>- Mide exclusión social y estándares de vida. | - No mide carencias absolutas.<br>- No representa “necesidades básicas”. |
+| **Línea de pobreza por Costo de Canasta Básica (CB–LP)** <br> *(Método usado por el DANE)* | Refleja el costo monetario de satisfacer necesidades básicas. | Usado en **América Latina**: México (CONEVAL), Chile, Perú, Argentina (INDEC). En Colombia lo calcula el **DANE** con la metodología oficial del Banco Mundial. | - Refleja necesidades reales de consumo.<br>- No depende de cambios relativos en salarios/ingresos | - Requiere estudios complejos de canastas y precios.<br>- Puede quedarse rezagado frente a cambios sociales.<br>- No captura pobreza relativa o exclusión social. |
+
+$$\\$$
+
+#### Paquete *smicd* desarrollado por los autores
+
+- Los autores implementan su metodología en el paquete de R *smicd*.  
+- El paquete está diseñado para trabajar con datos agrupados o censurados por intervalos.  
+- Facilita la aplicación práctica del algoritmo propuesto en el artículo.  
+
+$$\\$$
+
+¿Qué hace el paquete *smicd*?
+
+Implementa un **algoritmo de densidad kernel** para reconstruir la distribución del ingreso a partir de datos agrupados por intervalo.
+
+Calcula:
+
+- Media, mediana, cuantiles    
+- Coeficiente de Gini    
+- HCR (Tasade de incidencia de la pobreza)   
+- PGAP (Brecha de pobreza )  
+
+**Utiliza la línea de pobreza relativa** 
+
+
+$$\\$$
+$$\\$$
+
+Función *kdeAlgo* para la aplicación empírica del algoritmo:
+
+<pre>
+kdeAlgo(
+  xclass = datos_ingresos,
+  classes = limites_clase,
+  threshold = 0.6,
+  burnin = 80,
+  samples = 400,
+  bootstrap.se = TRUE,
+  b = 100,
+  bw = "nrd0",
+  evalpoints = 4000,
+  upper = 3,
+  weights = NULL
+)
+</pre>
+
+
+
+### 1. Medición de Pobreza Monetaria y Desigualdad 2024 del DANE
+
+$$\\$$
+<img src="DANE.png" width="65%" style="display: block; margin: auto;">
+
+$$\\$$
+
+La Medición de Pobreza Monetaria y Desigualdad 2024 (EMP 2024) es una operación estadística del Departamento Administrativo Nacional de Estadística (DANE), cuyo propósito es estimar los principales indicadores de pobreza monetaria, pobreza extrema y desigualdad de ingresos a nivel nacional, por dominio rural/urbano y para las 23 principales ciudades y áreas metropolitanas.
+
+En la edición 2024, se obtuvo información de 275.057 hogares en todo el país, a los cuales se les midieron las siguientes variables de interés.
+
+
+
+| **Variable**   | **Descripción**                                      | **Categorías / Valor** |
+|----------------|------------------------------------------------------|------------------------|
+| **p5090**      | Tenencia de la vivienda                              | 1. Propia pagada<br>2. Propia en pago<br>3. Arriendo / Subarriendo<br>4. Usufructo<br>5. Posesión sin título<br>6. Propiedad colectiva<br>7. Otra |
+| **p5100**      | Pago mensual por cuota de amortización               | Valor en pesos         |
+| **p5130**      | Arriendo imputado (estimado si tuviera que pagarse)  | Valor en pesos         |
+| **nper**       | Número de personas en el hogar                        | Conteo                 |
+| **ingtotug**   | Ingreso total (sin imputación de arriendo)           | Valor monetario        |
+| **ingtotarr**  | Ingreso total (con imputación de arriendo)           | Valor monetario        |
+| **ingpcug**    | Ingreso per cápita (con imputación de arriendo)      | Valor monetario        |
+| **li**         | Línea de indigencia                                   | Valor monetario        |
+| **lp**         | Línea de pobreza                                      | Valor monetario        |
+| **fex_c**      | Factor de expansión anualizado                        | Factor                 |
+| **fex_dpto**   | Factor de expansión departamental                     | Factor                 |
+| **dpto**       | Departamento                                          | Código DANE            |
+| **clase** | Tipo de área geográfica del hogar | 1. Cabecera (urbano)<br>2. Resto (rural) |
+
+La variable que se considerará es **ingpcug:** Ingreso per cápita (con imputación de arriendo).
+
+$$\\$$
+
+
+### 2. Agrupamiento por intervalos 
+
+Los intervalos de ingreso considerados para la construcción de las clases fueron los siguientes:
+
+- $[0,~~ 100.000)$
+
+- $[100.000,~~ 300.000)$
+
+- $[300.000,~~500.000)$
+
+- $[500.000,~~ 800.000)$
+
+- $[800.000,~~ 1.200.000)$
+
+- $[1.200.000,~~ 2.000.000)$
+
+- $[2.000.000,~~ 4.000.000)$
+
+- $[4.000.000,~~7.000.000)$
+
+- $[7.000.000,~~ 10.000.000)$
+
+- $[10.000.000,~~ 20.000.000)$ 
+
+- $[20.000.000,~~ \infty)$  
+
+
+
+```{r,include=FALSE}
+# 1. CARGA DE PAQUETES
+library(smicd)
+library(dplyr)
+library(ggplot2)
+library(purrr)
+
+# 2. CARGA Y PREPARACIÓN DE DATOS (MANTENIENDO SOLO LO ESENCIAL)
+setwd("C:/Users/labau/OneDrive/Escritorio/Seminario/Articulo/Aplicacion Articulo")
+Hogares <- read.csv("Hogares.csv")
+
+tabla_dptos <- data.frame(
+  dpto = c(5, 8, 11, 13, 15, 17, 18, 19, 20, 23, 25, 27, 41, 44, 47, 50, 52, 54, 
+           63, 66, 68, 70, 73, 76, 81, 85, 86, 88, 91, 94, 95, 97, 99),
+  nombre_dpto = c("Antioquia", "Atlántico", "Bogotá, D.C.", "Bolívar", "Boyacá",
+                  "Caldas", "Caquetá", "Cauca", "Cesar", "Córdoba", "Cundinamarca",
+                  "Chocó", "Huila", "La Guajira", "Magdalena", "Meta", "Nariño",
+                  "Norte de Santander", "Quindío", "Risaralda", "Santander", "Sucre",
+                  "Tolima", "Valle del Cauca", "Arauca", "Casanare", "Putumayo",
+                  "Archipiélago de San Andrés, Providencia y Santa Catalina",
+                  "Amazonas", "Guainía", "Guaviare", "Vaupés", "Vichada")
+)
+
+Hogares <- Hogares %>% 
+  left_join(tabla_dptos, by = "dpto")
+
+
+# 3. DEFINICIÓN DE INTERVALOS (MANTENIENDO)
+breaks_pc <- c(0, 100000, 300000, 500000, 800000, 1200000,
+               2000000, 4000000, 7000000, 10000000,
+               20000000, Inf)
+
+Hogares <- Hogares %>%
+  mutate(
+    xclass = cut(ingpcug, breaks = breaks_pc, include.lowest = TRUE, right = TRUE))
+
+Hogares2 <- Hogares %>%
+  mutate(xclass = factor(xclass, levels = levels(xclass)))
+```
+
+```{r grafico_frecuencia_papa, echo=FALSE, fig.width=6, fig.height=4}
+Hogares2 <- Hogares %>%
+  mutate(xclass = factor(xclass, levels = levels(xclass)))
+
+# Crear histograma usando los intervalos como barras
+ggplot(Hogares2, aes(x = xclass)) +
+  geom_bar(fill = "#003f5c", color = "white", width = 0.9) +
+  labs(
+    title = "Histograma de Ingresos Agrupados",
+    subtitle = "Intervalos definidos según cortes establecidos",
+    x = "Intervalos de ingreso",
+    y = "Frecuencia"
+  ) +
+  theme_bw(base_size = 14) +
+  theme(
+    plot.title = element_text(face = "bold", size = 16),
+    plot.subtitle = element_text(size = 12, margin = margin(b = 10)),
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    panel.grid.minor = element_blank()
+  )
+```
+
+$$\\$$
+
+
+### 3. Aplicacion del algoritmo
+
+<pre>
+library(smicd)
+library(dplyr)
+
+Hogares <- read.csv("Hogares.csv")
+limites_gr <- c(0, 100000, 300000, 500000, 800000, 1200000,
+               2000000, 4000000, 7000000, 10000000,
+               20000000, Inf)
+
+Hogares <- Hogares %>%
+  mutate(
+    xclass = cut(ingpcug, breaks = limites_gr))
+
+
+resultado_nacional <- kdeAlgo(
+  xclass = Hogares$xclass,
+  classes = limites_gr,
+  weights = Hogares$fex_c,
+  threshold = 0.6,
+  burnin = 80,           
+  samples = 400,         
+  bootstrap.se = TRUE,  
+  b = 100,             
+  bw = "nrd0",
+  evalpoints = 2000, 
+  upper = 3
+)
+</pre>
+
+$$\\$$
+
+### Análisis Nacional
+
+$$\\$$
+
+| **Indicador**              | **Nacional**       | **Cabecera**       | **Resto ** | **Unidad de Medida** |
+|----------------------------|-------------------|-------------------|--------------------------------------|---------------------|
+| **Coeficiente de Gini**    | 0.568             | 0.546             | 0.523                                |              |
+| **Percentil 10 (P10)**     | 200100.0         | 250125.0         | 100050.0                            | Pesos              |
+| **Percentil 25 (P25)**     | 400200.1         | 500250.1         | 200100.0                            | Pesos              |
+| **Media de ingresos**      | 1412611.9       | 1637142.4       | 598486.8                            | Pesos              |
+| **Mediana (P50)**          | 750375.2         | 950475.2         | 354927.5                            | Pesos              |
+| **Percentil 75 (P75)**     | 1550775.4       | 1800900.4       | 695222.6                            | Pesos              |
+| **Percentil 90 (P90)**     | 2997748.9       | 3492496.2       | 1230990.5                          | Pesos              |
+
+$$\\$$
+$$\\$$
+
+### Convergencia
+
+<img src="conv.png" width="90%" style="display: block; margin: auto;">
+
+
+### Análisis Departamental
+
+$$\\$$
+
+**Indice de gini**
+
+$$\\$$
+<img src="GINI.png" width="90%" style="display: block; margin: auto;">
+
+$$\\$$
+**Cuantil 10 de Ingreso per cápita (con imputación de arriendo) **
+
+$$\\$$
+<img src="10.png" width="90%" style="display: block; margin: auto;">
+
+$$\\$$
+**Cuantil 25 de Ingreso per cápita (con imputación de arriendo) **
+$$\\$$
+
+<img src="25.png" width="90%" style="display: block; margin: auto;">
+
+$$\\$$
+**Cuantil 50 de Ingreso per cápita (con imputación de arriendo) **
+
+$$\\$$
+<img src="50.png" width="90%" style="display: block; margin: auto;">
+
+$$\\$$
+**Cuantil 75 de Ingreso per cápita (con imputación de arriendo) **
+
+$$\\$$
+<img src="75.png" width="90%" style="display: block; margin: auto;">
+
+$$\\$$
+**Cuantil 90 de Ingreso per cápita (con imputación de arriendo) **
+
+$$\\$$
+<img src="90.png" width="90%" style="display: block; margin: auto;">
+
+____
+
+$$\\$$
+
+# Bibliografia
+
+- Walter, P., Gro$B$, M., Schmid, T. y Weimer, K. (2022). *Iterative Kernel Density Estimation Applied to Grouped Data: Estimating Poverty and Inequality Indicators from the German Microcensus*.Journal of Official Statistics, 38(2), 599--635.doi: 10.2478/JOS-2022-0027
+
+- Giraldo, R. (2025). Estadística No Paramétrica: Alternativas a Pruebas Clásicas, Estimación de la Densidad y Análisis de Regresión. Ilustraciones con R. Departamento de Estadística, Universidad Nacional de Colombia, Sede Bogot´a. Disponible en: https://sites.google.com/ a/unal.edu.co/ramon-giraldo-webpage/
+ 
+- Departamento Administrativo Nacional de Estadística (DANE). DSO-EMP-FME-001_F_V2: Documento técnico de la operación estadística de pobreza monetaria. Disponible en: https://www.dane.gov.co/files/operaciones/PM/DSO-EMP-FME-001_F_V2.pdf
+
